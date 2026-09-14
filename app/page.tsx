@@ -1,238 +1,210 @@
 'use client'
 
-import { useState, useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
+import { ArrowLeftRight, TriangleAlert } from 'lucide-react'
+import { Logo } from '@/components/logo'
+import { ColorSwatchPanel } from '@/components/color-swatch-panel'
+import { RatioGauge } from '@/components/ratio-gauge'
+import { WcagTable } from '@/components/wcag-table'
+import { PresetGrid } from '@/components/preset-grid'
+import { SpecimenFrame } from '@/components/specimen-frame'
+import { contrastRatio, getWcagLevels, isValidHex } from '@/lib/contrast'
 
-// WCAG contrast calculation
-function hexToRgb(hex: string): [number, number, number] | null {
-  const clean = hex.replace('#', '')
-  if (clean.length !== 6 && clean.length !== 3) return null
-  const full = clean.length === 3
-    ? clean.split('').map((c) => c + c).join('')
-    : clean
-  const r = parseInt(full.slice(0, 2), 16)
-  const g = parseInt(full.slice(2, 4), 16)
-  const b = parseInt(full.slice(4, 6), 16)
-  if (isNaN(r) || isNaN(g) || isNaN(b)) return null
-  return [r, g, b]
-}
-
-function linearize(c: number): number {
-  const sRGB = c / 255
-  return sRGB <= 0.03928 ? sRGB / 12.92 : Math.pow((sRGB + 0.055) / 1.055, 2.4)
-}
-
-function relativeLuminance(r: number, g: number, b: number): number {
-  return 0.2126 * linearize(r) + 0.7152 * linearize(g) + 0.0722 * linearize(b)
-}
-
-function contrastRatio(hex1: string, hex2: string): number | null {
-  const c1 = hexToRgb(hex1)
-  const c2 = hexToRgb(hex2)
-  if (!c1 || !c2) return null
-  const L1 = relativeLuminance(...c1)
-  const L2 = relativeLuminance(...c2)
-  const lighter = Math.max(L1, L2)
-  const darker = Math.min(L1, L2)
-  return (lighter + 0.05) / (darker + 0.05)
-}
-
-type WCAGLevel = 'AAA' | 'AA' | 'AA Large' | 'Fail'
-
-function getWCAGLevels(ratio: number) {
-  return {
-    normalAA: ratio >= 4.5,
-    normalAAA: ratio >= 7,
-    largeAA: ratio >= 3,
-    largeAAA: ratio >= 4.5,
-  }
-}
-
-const PRESETS = [
-  { label: 'Dark UI', fg: '#f5f5f5', bg: '#1a1a1a' },
-  { label: 'Light UI', fg: '#111111', bg: '#ffffff' },
-  { label: 'Ocean Blue', fg: '#ffffff', bg: '#1d4ed8' },
-  { label: 'Warning Yellow', fg: '#000000', bg: '#fbbf24' },
-  { label: 'Success Green', fg: '#ffffff', bg: '#16a34a' },
-  { label: 'Low Contrast', fg: '#888888', bg: '#aaaaaa' },
-  { label: 'Red on Black', fg: '#ef4444', bg: '#000000' },
-  { label: 'Slate', fg: '#0f172a', bg: '#e2e8f0' },
-]
-
-function Badge({ pass, label }: { pass: boolean; label: string }) {
-  return (
-    <div
-      className="flex items-center gap-2 px-3 py-2 rounded-lg"
-      style={{ background: pass ? '#16a34a20' : '#dc262620', border: `1px solid ${pass ? '#16a34a50' : '#dc262650'}` }}
-      role="status"
-    >
-      <span className="text-lg">{pass ? '✓' : '✕'}</span>
-      <div>
-        <div className="text-sm font-semibold" style={{ color: pass ? '#4ade80' : '#f87171' }}>
-          {pass ? 'Pass' : 'Fail'}
-        </div>
-        <div className="text-xs text-neutral-400">{label}</div>
-      </div>
-    </div>
-  )
-}
+const DEFAULT_FG = '#f5f5f5'
+const DEFAULT_BG = '#1a1a1a'
 
 export default function ContrastLabPage() {
-  const [fg, setFg] = useState('#f5f5f5')
-  const [bg, setBg] = useState('#1a1a1a')
-  const [fgHex, setFgHex] = useState('#f5f5f5')
-  const [bgHex, setBgHex] = useState('#1a1a1a')
+  const [fg, setFg] = useState(DEFAULT_FG)
+  const [bg, setBg] = useState(DEFAULT_BG)
+  const [fgInput, setFgInput] = useState(DEFAULT_FG)
+  const [bgInput, setBgInput] = useState(DEFAULT_BG)
 
-  const handleFgInput = useCallback((v: string) => {
-    setFgHex(v)
-    if (/^#[0-9a-fA-F]{6}$/.test(v) || /^#[0-9a-fA-F]{3}$/.test(v)) setFg(v)
+  const handleFgInput = useCallback((value: string) => {
+    setFgInput(value)
+    if (isValidHex(value)) setFg(value)
   }, [])
 
-  const handleBgInput = useCallback((v: string) => {
-    setBgHex(v)
-    if (/^#[0-9a-fA-F]{6}$/.test(v) || /^#[0-9a-fA-F]{3}$/.test(v)) setBg(v)
+  const handleBgInput = useCallback((value: string) => {
+    setBgInput(value)
+    if (isValidHex(value)) setBg(value)
   }, [])
 
-  const ratio = useMemo(() => contrastRatio(fg, bg), [fg, bg])
-  const levels = useMemo(() => ratio ? getWCAGLevels(ratio) : null, [ratio])
-
-  const ratioDisplay = ratio ? ratio.toFixed(2) : '—'
-  const ratioColor = !ratio ? '#888' : ratio >= 7 ? '#4ade80' : ratio >= 4.5 ? '#60a5fa' : ratio >= 3 ? '#fbbf24' : '#f87171'
+  const setPair = useCallback((nextFg: string, nextBg: string) => {
+    setFg(nextFg)
+    setFgInput(nextFg)
+    setBg(nextBg)
+    setBgInput(nextBg)
+  }, [])
 
   const swap = useCallback(() => {
-    setFg(bg); setFgHex(bg); setBg(fg); setBgHex(fg)
-  }, [fg, bg])
+    setPair(bg, fg)
+  }, [bg, fg, setPair])
+
+  const ratio = useMemo(() => contrastRatio(fg, bg), [fg, bg])
+  const levels = useMemo(() => (ratio ? getWcagLevels(ratio) : null), [ratio])
+  const ratioDisplay = ratio ? ratio.toFixed(2) : '—'
 
   return (
-    <div className="min-h-full bg-[#0f0f0f] text-neutral-100">
-      <div className="max-w-4xl mx-auto p-6 md:p-10">
-        <header className="mb-8">
-          <h1 className="text-2xl font-bold tracking-tight mb-1">ContrastLab</h1>
-          <p className="text-sm text-neutral-500">WCAG 2.1 color contrast checker & accessibility tool</p>
-        </header>
+    <div className="min-h-full">
+      <header className="border-b border-[var(--line)]">
+        <div className="mx-auto flex max-w-5xl items-center gap-3 px-6 py-5 sm:px-10">
+          <Logo size={28} />
+          <div>
+            <p className="text-base font-bold tracking-[0.08em] uppercase">ContrastLab</p>
+            <p className="font-mono text-xs text-[var(--ink-faint)]">WCAG 2.1 contrast instrument</p>
+          </div>
+          <span className="ml-auto hidden border border-[var(--line)] px-2.5 py-1 font-mono text-xs text-[var(--ink-muted)] sm:inline-block">
+            SC 1.4.3 / 1.4.6
+          </span>
+        </div>
+      </header>
 
-        <div className="grid md:grid-cols-2 gap-8">
-          {/* Controls */}
-          <div className="space-y-6">
-            {/* Color pickers */}
-            <div className="bg-[#1a1a1a] border border-[#2e2e2e] rounded-xl p-5 space-y-4">
-              <h2 className="text-sm font-semibold text-neutral-300">Colors</h2>
-              {[
-                { label: 'Foreground (text)', color: fg, hex: fgHex, onColor: (v: string) => { setFg(v); setFgHex(v) }, onHex: handleFgInput },
-                { label: 'Background', color: bg, hex: bgHex, onColor: (v: string) => { setBg(v); setBgHex(v) }, onHex: handleBgInput },
-              ].map(({ label, color, hex, onColor, onHex }) => (
-                <div key={label}>
-                  <label className="block text-xs text-neutral-500 mb-2">{label}</label>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="color"
-                      value={color}
-                      onChange={(e) => onColor(e.target.value)}
-                      className="w-10 h-10 rounded cursor-pointer border border-[#333] bg-transparent"
-                      aria-label={label}
-                    />
-                    <input
-                      type="text"
-                      value={hex}
-                      onChange={(e) => onHex(e.target.value)}
-                      className="flex-1 bg-[#242424] border border-[#333] rounded px-3 py-2 text-sm font-mono text-neutral-200 outline-none focus:border-blue-500"
-                      placeholder="#000000"
-                      aria-label={`${label} hex value`}
-                    />
-                    <div className="w-10 h-10 rounded border border-[#333]" style={{ background: color }} aria-hidden />
-                  </div>
-                </div>
-              ))}
+      <main className="mx-auto max-w-5xl px-6 py-10 sm:px-10 sm:py-14">
+        {/* The instrument: two color panels with the measurement between them */}
+        <section aria-labelledby="measure-heading">
+          <h1 id="measure-heading" className="sr-only">
+            Measure the contrast ratio between two colors
+          </h1>
+
+          <div className="flex flex-col gap-0 md:flex-row md:items-stretch">
+            <ColorSwatchPanel
+              role="Foreground"
+              hexInput={fgInput}
+              committedColor={fg}
+              onHexChange={handleFgInput}
+              onColorChange={(v) => setPair(v, bg)}
+            />
+
+            <div className="flex shrink-0 items-center justify-center py-3 md:w-14 md:py-0">
               <button
+                type="button"
                 onClick={swap}
-                className="w-full py-2 text-xs text-neutral-500 hover:text-neutral-200 border border-[#2e2e2e] hover:border-[#444] rounded transition-colors"
+                className="flex h-11 w-11 items-center justify-center border border-[var(--line)] bg-[var(--surface)] text-[var(--ink)] transition-colors hover:border-[var(--ink)]"
                 aria-label="Swap foreground and background colors"
               >
-                ↕ Swap colors
+                <ArrowLeftRight size={18} className="rotate-90 md:rotate-0" aria-hidden="true" />
               </button>
             </div>
 
-            {/* Presets */}
-            <div className="bg-[#1a1a1a] border border-[#2e2e2e] rounded-xl p-5">
-              <h2 className="text-sm font-semibold text-neutral-300 mb-3">Presets</h2>
-              <div className="grid grid-cols-2 gap-2">
-                {PRESETS.map((p) => {
-                  const r = contrastRatio(p.fg, p.bg)
-                  const pass = r ? r >= 4.5 : false
-                  return (
-                    <button
-                      key={p.label}
-                      onClick={() => { setFg(p.fg); setFgHex(p.fg); setBg(p.bg); setBgHex(p.bg) }}
-                      className="flex items-center gap-2.5 p-2.5 rounded-lg border border-[#2e2e2e] hover:border-[#444] transition-colors text-left"
-                      style={{ background: p.bg }}
-                    >
-                      <span className="text-xs font-medium" style={{ color: p.fg }}>{p.label}</span>
-                      <span
-                        className="ml-auto text-xs rounded px-1"
-                        style={{
-                          background: pass ? '#16a34a30' : '#dc262630',
-                          color: pass ? '#4ade80' : '#f87171',
-                          border: `1px solid ${pass ? '#16a34a50' : '#dc262650'}`,
-                        }}
-                      >
-                        {r ? r.toFixed(1) : '—'}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
+            <ColorSwatchPanel
+              role="Background"
+              hexInput={bgInput}
+              committedColor={bg}
+              onHexChange={handleBgInput}
+              onColorChange={(v) => setPair(fg, v)}
+            />
           </div>
 
-          {/* Results */}
-          <div className="space-y-6">
-            {/* Preview */}
-            <div
-              className="rounded-xl p-6 border border-[#2e2e2e]"
-              style={{ background: bg }}
-              aria-label="Color preview"
+          {/* Ratio readout */}
+          <div className="mt-8 border border-[var(--line)] p-6 sm:p-8">
+            <div className="flex flex-col items-start gap-6 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="font-mono text-xs tracking-[0.15em] text-[var(--ink-faint)] uppercase">
+                  Contrast ratio
+                </p>
+                <p className="mt-1 font-mono text-6xl leading-none font-semibold tabular-nums sm:text-7xl">
+                  {ratioDisplay}
+                  <span className="ml-2 text-2xl text-[var(--ink-faint)] sm:text-3xl">:1</span>
+                </p>
+              </div>
+              {levels && (
+                <p className="font-mono text-sm text-[var(--ink-muted)]">
+                  {levels.normalAAA
+                    ? 'Meets AAA for normal text'
+                    : levels.normalAA
+                      ? 'Meets AA for normal text'
+                      : levels.largeAA
+                        ? 'Meets AA for large text only'
+                        : 'Fails minimum WCAG contrast'}
+                </p>
+              )}
+            </div>
+
+            {ratio && (
+              <div className="mt-6">
+                <RatioGauge ratio={ratio} />
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Live specimen preview */}
+        <section className="mt-10" aria-labelledby="specimen-heading">
+          <h2
+            id="specimen-heading"
+            className="mb-3 font-mono text-xs tracking-[0.15em] text-[var(--ink-faint)] uppercase"
+          >
+            Specimen preview
+          </h2>
+          <SpecimenFrame>
+            <div className="p-8 sm:p-10" style={{ backgroundColor: bg, color: fg }}>
+              <p className="mb-2 text-3xl font-bold sm:text-4xl">Large text sample</p>
+              <p className="mb-3 max-w-prose text-base">
+                This is normal-size body copy, set the way it would appear in a real interface, so
+                you can judge legibility rather than trust the number alone.
+              </p>
+              <p className="text-sm opacity-80">Small print at 14px — the first place low contrast is felt.</p>
+            </div>
+          </SpecimenFrame>
+        </section>
+
+        {/* Compliance table */}
+        {levels && (
+          <section className="mt-10" aria-labelledby="compliance-heading">
+            <h2
+              id="compliance-heading"
+              className="mb-3 font-mono text-xs tracking-[0.15em] text-[var(--ink-faint)] uppercase"
             >
-              <div style={{ color: fg }}>
-                <p className="text-2xl font-bold mb-1">Large Text Sample</p>
-                <p className="text-sm mb-3">This is normal-size body text showing how your color combination looks in practice.</p>
-                <p className="text-xs text-current opacity-70">Small text (12px) — harder to read at low contrast</p>
-              </div>
+              WCAG 2.1 compliance
+            </h2>
+            <div className="border border-[var(--line)] px-5">
+              <WcagTable levels={levels} />
             </div>
+            <p className="mt-2 text-base text-[var(--ink-muted)]">
+              Large text is 18pt+, or 14pt+ and bold. Non-text UI elements follow the 3:1 minimum.
+            </p>
+          </section>
+        )}
 
-            {/* Ratio display */}
-            <div className="bg-[#1a1a1a] border border-[#2e2e2e] rounded-xl p-5 text-center">
-              <div className="text-sm text-neutral-500 mb-2">Contrast Ratio</div>
-              <div className="text-6xl font-black tabular-nums mb-1" style={{ color: ratioColor }}>
-                {ratioDisplay}
-              </div>
-              <div className="text-sm text-neutral-500">:1</div>
+        {/* Suggestion */}
+        {ratio && ratio < 4.5 && (
+          <section className="mt-6" aria-live="polite">
+            <div className="flex gap-3 border border-dashed border-[var(--ink)] p-4">
+              <TriangleAlert size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
+              <p className="text-base text-[var(--ink)]">
+                <strong className="font-semibold">Suggestion —</strong> darken the foreground or
+                lighten the background to reach AA (4.5:1). Current ratio is {ratio.toFixed(2)}:1,
+                about {(4.5 / ratio * 100 - 100).toFixed(0)}% short.
+              </p>
             </div>
+          </section>
+        )}
 
-            {/* WCAG badges */}
-            {levels && (
-              <div className="bg-[#1a1a1a] border border-[#2e2e2e] rounded-xl p-5 space-y-3">
-                <h2 className="text-sm font-semibold text-neutral-300">WCAG 2.1 Compliance</h2>
-                <div className="grid grid-cols-2 gap-2">
-                  <Badge pass={levels.normalAA} label="AA — Normal text (4.5:1)" />
-                  <Badge pass={levels.normalAAA} label="AAA — Normal text (7:1)" />
-                  <Badge pass={levels.largeAA} label="AA — Large text (3:1)" />
-                  <Badge pass={levels.largeAAA} label="AAA — Large text (4.5:1)" />
-                </div>
-                <div className="text-xs text-neutral-600 pt-2 border-t border-[#2e2e2e]">
-                  Large text = 18pt+ or 14pt+ bold. Non-text elements follow 3:1 minimum.
-                </div>
-              </div>
-            )}
+        {/* Reference presets */}
+        <section className="mt-10" aria-labelledby="presets-heading">
+          <h2
+            id="presets-heading"
+            className="mb-3 font-mono text-xs tracking-[0.15em] text-[var(--ink-faint)] uppercase"
+          >
+            Reference pairs
+          </h2>
+          <PresetGrid onSelect={setPair} />
+        </section>
+      </main>
 
-            {/* Improvement hint */}
-            {ratio && ratio < 4.5 && (
-              <div className="bg-amber-950/30 border border-amber-800/40 rounded-xl p-4 text-sm text-amber-300">
-                <strong>Tip:</strong> To reach AA compliance (4.5:1), try darkening your foreground or lightening your background color.
-                Current ratio is {ratio.toFixed(2)}:1 — needs {(4.5 / ratio * 100 - 100).toFixed(0)}% more contrast.
-              </div>
-            )}
-          </div>
+      <footer className="mt-16 border-t border-[var(--line)]">
+        <div className="mx-auto flex max-w-5xl flex-col gap-2 px-6 py-6 text-base text-[var(--ink-faint)] sm:flex-row sm:items-center sm:justify-between sm:px-10">
+          <p>Contrast ratios computed per the WCAG 2.1 relative luminance formula.</p>
+          <a
+            href="https://www.w3.org/TR/WCAG21/#contrast-minimum"
+            target="_blank"
+            rel="noreferrer"
+            className="underline decoration-[var(--line)] underline-offset-4 hover:decoration-[var(--ink)]"
+          >
+            Read the specification
+          </a>
         </div>
-      </div>
+      </footer>
     </div>
   )
 }

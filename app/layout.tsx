@@ -1,15 +1,31 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
+import { Instrument_Sans, IBM_Plex_Mono } from 'next/font/google'
 import './globals.css'
-const inter = Inter({ subsets: ['latin'] })
+
+const instrumentSans = Instrument_Sans({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-instrument-sans',
+  display: 'swap',
+})
+
+const ibmPlexMono = IBM_Plex_Mono({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-ibm-plex-mono',
+  display: 'swap',
+})
+
 export const metadata: Metadata = {
   title: 'ContrastLab — WCAG Color Contrast Checker',
-  description: 'Check WCAG 2.1 color contrast ratios, simulate color blindness, and get suggestions for accessible color pairs.',
+  description:
+    'Measure the WCAG 2.1 contrast ratio between two colors, check AA/AAA compliance for normal and large text, and find accessible color pairs.',
 }
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="h-full">
-      <body className={`${inter.className} h-full antialiased`}>{children}</body>
+    <html lang="en" className={`h-full ${instrumentSans.variable} ${ibmPlexMono.variable}`}>
+      <body className="h-full antialiased">{children}</body>
     </html>
   )
 }

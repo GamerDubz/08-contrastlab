@@ -1,4 +1,57 @@
 @import "tailwindcss";
-* { box-sizing: border-box; }
-html, body { height: 100%; margin: 0; }
-@media (prefers-reduced-motion: reduce) { * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }
+
+:root {
+  --paper: #fbfbfa;
+  --surface: #ffffff;
+  --ink: #0a0a0a;
+  --ink-muted: #525252;
+  --ink-faint: #6b6b6b;
+  --line: #dcdcda;
+  --line-strong: #0a0a0a;
+  --font-sans: var(--font-instrument-sans), system-ui, sans-serif;
+  --font-mono: var(--font-ibm-plex-mono), ui-monospace, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background-color: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  /* A faint measurement grid — the instrument-bench texture the rest of the
+     UI sits on. Kept extremely low-contrast so it never competes with content. */
+  background-image:
+    linear-gradient(to right, var(--line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--line) 1px, transparent 1px);
+  background-size: 32px 32px;
+  background-position: -1px -1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* One visible, consistent focus treatment for every interactive element. */
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+::selection {
+  background: var(--ink);
+  color: var(--paper);
+}
